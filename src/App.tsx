@@ -5,6 +5,7 @@ import { DashboardPage } from '@/pages/DashboardPage'
 import { CompaniesPage } from '@/pages/CompaniesPage'
 import { FlowsPage } from '@/pages/FlowsPage'
 import { CustomersPage } from '@/pages/CustomersPage'
+import { CustomerPortalPage } from '@/pages/CustomerPortalPage'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { blink } from '@/lib/blink'
@@ -73,6 +74,8 @@ function AppContent() {
   const { user, isLoading } = useAuth()
   const [currentPage, setCurrentPage] = useState('dashboard')
 
+  const isPortal = window.location.search.includes('c=') && window.location.search.includes('f=')
+
   if (isLoading) {
     return (
       <div className="h-screen flex items-center justify-center">
@@ -82,6 +85,10 @@ function AppContent() {
         </div>
       </div>
     )
+  }
+
+  if (isPortal) {
+    return <CustomerPortalPage />
   }
 
   if (!user) {
@@ -120,4 +127,4 @@ function App() {
   )
 }
 
-export default App 
+export default App

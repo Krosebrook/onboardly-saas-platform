@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { blink } from '@/lib/blink'
-import { Building2, Users, Workflow, TrendingUp } from 'lucide-react'
-import type { Company, Customer, OnboardingFlow } from '@/types'
+import { Building2, Users, Workflow, TrendingUp, Clock, AlertCircle } from 'lucide-react'
+import type { Company, Customer, OnboardingFlow, CustomerProgress, Step } from '@/types'
 
 export function DashboardPage() {
   const [stats, setStats] = useState({
     companies: 0,
     customers: 0,
     flows: 0,
-    completionRate: 0
+    completionRate: 0,
+    pendingReminders: 0
   })
+  const [recentActivity, setRecentActivity] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -22,18 +24,58 @@ export function DashboardPage() {
       const user = await blink.auth.me()
       if (!user) return
 
-      const [companies, customers, flows] = await Promise.all([
+      const [companies, customers, flows, allProgress, allSteps] = await Promise.all([
         blink.db.companies.list<Company>({ where: { userId: user.id } }),
         blink.db.customers.list<Customer>({ where: { userId: user.id } }),
-        blink.db.onboardingFlows.list<OnboardingFlow>({ where: { userId: user.id } })
+        blink.db.onboardingFlows.list<OnboardingFlow>({ where: { userId: user.id } }),
+        blink.db.customerProgress.list<CustomerProgress>({ where: { userId: user.id }, orderBy: { updatedAt: 'desc' } }),
+        blink.db.steps.list<Step>({ where: { userId: user.id } })
       ])
+
+      // Calculate completion rate
+      // For each customer/flow pair, how many steps are completed vs total steps in that flow
+      let totalCompleted = 0
+      let totalExpected = 0
+
+      customers.forEach(customer => {
+        flows.forEach(flow => {
+          const flowSteps = allSteps.filter(s => s.flowId === flow.id)
+          if (flowSteps.length === 0) return
+
+          const customerFlowProgress = allProgress.filter(p => p.customerId === customer.id && p.flowId === flow.id)
+          const completedInFlow = customerFlowProgress.filter(p => p.status === 'completed').length
+          
+          if (customerFlowProgress.length > 0) {
+            totalCompleted += completedInFlow
+            totalExpected += flowSteps.length
+          }
+        })
+      })
+
+      const completionRate = totalExpected > 0 ? Math.round((totalCompleted / totalExpected) * 100) : 0
 
       setStats({
         companies: companies.length,
         customers: customers.length,
         flows: flows.length,
-        completionRate: 0 // Will calculate from progress data
+        completionRate,
+        pendingReminders: 0 // Placeholder
       })
+
+      // Recent Activity
+      const activity = allProgress.slice(0, 5).map(p => {
+        const customer = customers.find(c => c.id === p.customerId)
+        const step = allSteps.find(s => s.id === p.stepId)
+        return {
+          id: p.id,
+          customerName: customer?.name || customer?.email || 'Unknown',
+          stepTitle: step?.title || 'Unknown step',
+          status: p.status,
+          updatedAt: p.updatedAt
+        }
+      })
+      setRecentActivity(activity)
+
     } catch (error) {
       console.error('Failed to load stats:', error)
     } finally {
@@ -130,9 +172,29 @@ export function DashboardPage() {
             <CardDescription>Latest customer onboarding updates</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">
-              No recent activity yet. Start by creating a company and onboarding flow.
-            </p>
+            {recentActivity.length > 0 ? (
+              <div className="space-y-4">
+                {recentActivity.map((activity) => (
+                  <div key={activity.id} className="flex items-center gap-4">
+                    <div className={`h-2 w-2 rounded-full ${
+                      activity.status === 'completed' ? 'bg-primary' : 'bg-muted-foreground'
+                    }`} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium">
+                        {activity.customerName} {activity.status === 'completed' ? 'completed' : 'updated'} <span className="text-primary">{activity.stepTitle}</span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(activity.updatedAt).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No recent activity yet. Start by creating a company and onboarding flow.
+              </p>
+            )}
           </CardContent>
         </Card>
 

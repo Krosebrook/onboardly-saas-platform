@@ -7,13 +7,14 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { blink } from '@/lib/blink'
-import { Plus, Users, Mail, Trash2, Building2 } from 'lucide-react'
+import { Plus, Users, Mail, Trash2, Building2, Bell, ExternalLink, Copy } from 'lucide-react'
 import { toast } from 'sonner'
-import type { Company, Customer } from '@/types'
+import type { Company, Customer, OnboardingFlow } from '@/types'
 
 export function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [companies, setCompanies] = useState<Company[]>([])
+  const [flows, setFlows] = useState<OnboardingFlow[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [formData, setFormData] = useState({
@@ -32,16 +33,18 @@ export function CustomersPage() {
       const user = await blink.auth.me()
       if (!user) return
 
-      const [customersData, companiesData] = await Promise.all([
+      const [customersData, companiesData, flowsData] = await Promise.all([
         blink.db.customers.list<Customer>({
           where: { userId: user.id },
           orderBy: { createdAt: 'desc' }
         }),
-        blink.db.companies.list<Company>({ where: { userId: user.id } })
+        blink.db.companies.list<Company>({ where: { userId: user.id } }),
+        blink.db.onboardingFlows.list<OnboardingFlow>({ where: { userId: user.id } })
       ])
 
       setCustomers(customersData)
       setCompanies(companiesData)
+      setFlows(flowsData)
     } catch (error) {
       console.error('Failed to load data:', error)
       toast.error('Failed to load customers')
@@ -91,6 +94,53 @@ export function CustomersPage() {
       console.error('Failed to delete customer:', error)
       toast.error('Failed to delete customer')
     }
+  }
+
+  const handleSendReminder = async (customer: Customer) => {
+    try {
+      const companyFlows = flows.filter(f => f.companyId === customer.companyId)
+      if (companyFlows.length === 0) {
+        toast.error('No onboarding flow found for this company')
+        return
+      }
+
+      const flow = companyFlows[0] // Just use the first one for now
+      const portalUrl = `${window.location.origin}/?c=${customer.id}&f=${flow.id}`
+
+      await blink.notifications.email({
+        to: customer.email,
+        subject: `Reminder: Continue your onboarding for ${flow.name}`,
+        html: `
+          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; rounded-lg;">
+            <h1 style="color: #0d9488; margin-bottom: 20px;">Don't forget to complete your setup!</h1>
+            <p style="color: #4b5563; line-height: 1.6;">Hi ${customer.name || 'there'},</p>
+            <p style="color: #4b5563; line-height: 1.6;">We noticed you haven't finished your onboarding for <strong>${flow.name}</strong> yet. Completing these steps will help you get the most out of our platform.</p>
+            <div style="margin: 30px 0;">
+              <a href="${portalUrl}" style="background-color: #0d9488; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Continue Onboarding</a>
+            </div>
+            <p style="color: #9ca3af; font-size: 14px;">If the button doesn't work, copy and paste this link: ${portalUrl}</p>
+          </div>
+        `
+      })
+
+      toast.success(`Reminder sent to ${customer.email}`)
+    } catch (error) {
+      console.error('Failed to send reminder:', error)
+      toast.error('Failed to send reminder')
+    }
+  }
+
+  const copyPortalLink = (customer: Customer) => {
+    const companyFlows = flows.filter(f => f.companyId === customer.companyId)
+    if (companyFlows.length === 0) {
+      toast.error('No onboarding flow found for this company')
+      return
+    }
+
+    const flow = companyFlows[0]
+    const portalUrl = `${window.location.origin}/?c=${customer.id}&f=${flow.id}`
+    navigator.clipboard.writeText(portalUrl)
+    toast.success('Portal link copied to clipboard')
   }
 
   if (isLoading) {
@@ -193,9 +243,31 @@ export function CustomersPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-xs text-muted-foreground">
-                    Added {new Date(customer.createdAt).toLocaleDateString()}
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">
+                      Added {new Date(customer.createdAt).toLocaleDateString()}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => copyPortalLink(customer)}
+                      >
+                        <Copy className="h-3 w-3" />
+                        Link
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => handleSendReminder(customer)}
+                      >
+                        <Bell className="h-3 w-3" />
+                        Remind
+                      </Button>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             )

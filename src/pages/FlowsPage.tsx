@@ -7,16 +7,17 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { blink } from '@/lib/blink'
-import { Plus, Workflow, Trash2, Edit, CheckCircle2, Building2 } from 'lucide-react'
+import { Plus, Workflow, Trash2, Edit, CheckCircle2, Building2, ListTodo } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Company, OnboardingFlow, Step } from '@/types'
+import { FlowStepsPage } from './FlowStepsPage'
 
 export function FlowsPage() {
   const [flows, setFlows] = useState<OnboardingFlow[]>([])
   const [companies, setCompanies] = useState<Company[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [selectedFlow, setSelectedFlow] = useState<OnboardingFlow | null>(null)
+  const [viewingStepsFlowId, setViewingStepsFlowId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -106,6 +107,10 @@ export function FlowsPage() {
       console.error('Failed to toggle flow:', error)
       toast.error('Failed to update flow')
     }
+  }
+
+  if (viewingStepsFlowId) {
+    return <FlowStepsPage flowId={viewingStepsFlowId} onBack={() => setViewingStepsFlowId(null)} />
   }
 
   if (isLoading) {
@@ -216,8 +221,13 @@ export function FlowsPage() {
                     >
                       {isActive ? 'Deactivate' : 'Activate'}
                     </Button>
-                    <Button variant="outline" size="sm" className="gap-2">
-                      <Edit className="h-3 w-3" />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                      onClick={() => setViewingStepsFlowId(flow.id)}
+                    >
+                      <ListTodo className="h-3 w-3" />
                       Edit Steps
                     </Button>
                   </div>

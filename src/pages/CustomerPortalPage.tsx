@@ -1,10 +1,21 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { CheckCircle2, Circle, Clock, ChevronRight } from 'lucide-react'
+import { CheckCircle2, Circle, Clock, ChevronRight, MessageSquare, Send, X, Loader2, User, Bot } from 'lucide-react'
 import { blink } from '@/lib/blink'
 import { toast } from 'sonner'
 import type { OnboardingFlow, Step, CustomerProgress, Customer } from '@/types'
+import { Agent, useAgent } from '@blinkdotnew/react'
+
+const conciergeAgent = new Agent({
+  model: 'google/gemini-2.5-flash',
+  system: `You are a helpful onboarding concierge for Onboardly. 
+Your goal is to help end-customers complete their onboarding journey successfully.
+You will be provided with the current flow steps and the customer's progress.
+Answer questions accurately based on the step content.
+If you don't know something, suggest they contact their account manager.
+Be friendly, encouraging, and professional.`,
+})
 
 // This page is meant to be public-facing
 export function CustomerPortalPage() {
@@ -14,6 +25,49 @@ export function CustomerPortalPage() {
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null)
+  const [isChatOpen, setIsChatOpen] = useState(false)
+
+  const {
+    messages,
+    input,
+    handleInputChange,
+    handleSubmit,
+    isLoading: isAgentLoading,
+  } = useAgent({ 
+    agent: conciergeAgent,
+    initialMessages: [
+      {
+        id: 'welcome',
+        role: 'assistant',
+        content: "Hi! I'm your onboarding concierge. How can I help you with your journey today?",
+      }
+    ]
+  })
+
+  // Update agent system prompt with context whenever data changes
+  useEffect(() => {
+    if (flow && steps.length > 0 && customer) {
+      const stepsContext = steps.map((s, i) => `Step ${i + 1}: ${s.title}\nDescription: ${s.description}\nInstructions: ${s.content}`).join('\n\n')
+      const progressContext = steps.map(s => {
+        const p = progress.find(pr => pr.stepId === s.id)
+        return `${s.title}: ${p?.status || 'not_started'}`
+      }).join('\n')
+
+      conciergeAgent.system = `You are a helpful onboarding concierge for Onboardly. 
+Customer Name: ${customer.name || customer.email}
+Current Flow: ${flow.name}
+Flow Description: ${flow.description || 'No description'}
+
+FLOW STEPS:
+${stepsContext}
+
+CUSTOMER PROGRESS:
+${progressContext}
+
+Your goal is to help the customer complete these steps. Answer their questions about how to do things based on the instructions provided.
+If they are stuck, guide them. If they ask about things not in the flow, tell them you only have information about this onboarding process.`
+    }
+  }, [flow, steps, customer, progress])
 
   // In a real app, these would come from the URL params
   // For this demo/MVP, we'll try to find them from a "token" or similar
@@ -129,7 +183,7 @@ export function CustomerPortalPage() {
   const isSelectedComplete = progress.find(p => p.stepId === selectedStepId)?.status === 'completed'
 
   return (
-    <div className="min-h-screen bg-muted/30 pb-12">
+    <div className="min-h-screen bg-muted/30 pb-12 relative">
       <div className="bg-background border-b sticky top-0 z-10">
         <div className="container mx-auto px-4 h-20 flex items-center justify-between">
           <div>
@@ -249,6 +303,98 @@ export function CustomerPortalPage() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* AI Concierge Chat Widget */}
+      <div className="fixed bottom-6 right-6 z-50">
+        {isChatOpen ? (
+          <Card className="w-[350px] sm:w-[400px] h-[500px] flex flex-col shadow-2xl border-primary/20 animate-in slide-in-from-bottom-4 duration-300">
+            <CardHeader className="bg-primary text-primary-foreground py-4 rounded-t-xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="bg-white/20 p-1.5 rounded-lg">
+                    <Bot className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">Onboarding Concierge</CardTitle>
+                    <CardDescription className="text-primary-foreground/70 text-xs">AI Assistant</CardDescription>
+                  </div>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => setIsChatOpen(false)}
+                  className="text-primary-foreground hover:bg-white/10 h-8 w-8"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
+              {messages.map((m) => (
+                <div 
+                  key={m.id} 
+                  className={`flex gap-3 ${m.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
+                >
+                  <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${
+                    m.role === 'user' ? 'bg-primary' : 'bg-muted'
+                  }`}>
+                    {m.role === 'user' ? <User className="h-4 w-4 text-primary-foreground" /> : <Bot className="h-4 w-4 text-foreground" />}
+                  </div>
+                  <div className={`p-3 rounded-2xl text-sm max-w-[80%] ${
+                    m.role === 'user' 
+                      ? 'bg-primary text-primary-foreground rounded-tr-none' 
+                      : 'bg-muted text-foreground rounded-tl-none'
+                  }`}>
+                    {m.content}
+                  </div>
+                </div>
+              ))}
+              {isAgentLoading && (
+                <div className="flex gap-3">
+                  <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+                    <Bot className="h-4 w-4 text-foreground" />
+                  </div>
+                  <div className="bg-muted p-3 rounded-2xl rounded-tl-none">
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  </div>
+                </div>
+              )}
+            </CardContent>
+            <div className="p-4 border-t bg-background rounded-b-xl">
+              <form 
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  handleSubmit(e)
+                }} 
+                className="flex gap-2"
+              >
+                <input
+                  value={input}
+                  onChange={handleInputChange}
+                  placeholder="Ask a question..."
+                  className="flex-1 bg-muted border-none rounded-full px-4 py-2 text-sm focus:ring-1 focus:ring-primary outline-none"
+                />
+                <Button 
+                  type="submit" 
+                  size="icon" 
+                  disabled={isAgentLoading || !input.trim()}
+                  className="rounded-full h-9 w-9"
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
+              </form>
+            </div>
+          </Card>
+        ) : (
+          <Button 
+            onClick={() => setIsChatOpen(true)}
+            size="lg"
+            className="rounded-full h-14 w-14 shadow-xl hover:scale-105 transition-transform"
+          >
+            <MessageSquare className="h-6 w-6" />
+          </Button>
+        )}
       </div>
     </div>
   )

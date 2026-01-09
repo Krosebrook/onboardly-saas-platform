@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { blink } from '@/lib/blink'
-import { Building2, Users, Workflow, TrendingUp, Clock, AlertCircle } from 'lucide-react'
+import { Building2, Users, Workflow, TrendingUp, Clock, AlertCircle, Sparkles, Loader2, BrainCircuit } from 'lucide-react'
 import type { Company, Customer, OnboardingFlow, CustomerProgress, Step } from '@/types'
 
 export function DashboardPage() {
@@ -14,6 +14,8 @@ export function DashboardPage() {
   })
   const [recentActivity, setRecentActivity] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [aiAnalysis, setAiAnalysis] = useState<string | null>(null)
 
   useEffect(() => {
     loadStats()
@@ -76,10 +78,41 @@ export function DashboardPage() {
       })
       setRecentActivity(activity)
 
+      // Generate AI Analysis if we have data
+      if (customers.length > 0 && flows.length > 0) {
+        generatePredictiveAnalysis(customers, flows, allSteps, allProgress)
+      }
+
     } catch (error) {
       console.error('Failed to load stats:', error)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const generatePredictiveAnalysis = async (customers: any[], flows: any[], steps: any[], progress: any[]) => {
+    setIsAnalyzing(true)
+    try {
+      const dataContext = {
+        totalCustomers: customers.length,
+        flows: flows.map(f => ({
+          name: f.name,
+          steps: steps.filter(s => s.flowId === f.id).map(s => ({
+            title: s.title,
+            completions: progress.filter(p => p.stepId === s.id && p.status === 'completed').length
+          }))
+        }))
+      }
+
+      const { text } = await blink.ai.generateText({
+        prompt: `Analyze this onboarding data and identify drop-off points. Suggest specific improvements for each flow to improve activation:\n\n${JSON.stringify(dataContext, null, 2)}`,
+        system: "You are a product activation expert. You analyze user onboarding data to identify where users are getting stuck and provide actionable advice to improve completion rates."
+      })
+      setAiAnalysis(text)
+    } catch (error) {
+      console.error('Analysis failed:', error)
+    } finally {
+      setIsAnalyzing(false)
     }
   }
 
@@ -164,6 +197,40 @@ export function DashboardPage() {
           )
         })}
       </div>
+
+      {/* Predictive Activation Analytics Section */}
+      <Card className="border-primary/20 bg-primary/5">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <BrainCircuit className="h-5 w-5 text-primary" />
+              Predictive Activation Analytics
+            </CardTitle>
+            <CardDescription>AI-powered insights into customer drop-offs and activation bottlenecks</CardDescription>
+          </div>
+          {isAnalyzing && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
+        </CardHeader>
+        <CardContent>
+          {aiAnalysis ? (
+            <div className="prose prose-sm max-w-none dark:prose-invert">
+              <div className="bg-background/50 rounded-lg p-4 text-sm text-foreground whitespace-pre-wrap border border-primary/10">
+                {aiAnalysis}
+              </div>
+            </div>
+          ) : isAnalyzing ? (
+            <div className="space-y-2">
+              <div className="h-4 bg-primary/10 rounded animate-pulse w-full" />
+              <div className="h-4 bg-primary/10 rounded animate-pulse w-5/6" />
+              <div className="h-4 bg-primary/10 rounded animate-pulse w-4/6" />
+            </div>
+          ) : (
+            <div className="text-center py-6 text-muted-foreground">
+              <Sparkles className="h-8 w-8 mx-auto mb-2 opacity-20" />
+              <p>Add more customer progress data to see AI-powered insights</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card>

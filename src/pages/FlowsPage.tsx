@@ -241,11 +241,18 @@ export function FlowsPage() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create Onboarding Flow</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              {isAIEnabled ? <Sparkles className="h-5 w-5 text-primary" /> : null}
+              {isAIEnabled ? 'AI Flow Architect' : 'Create Onboarding Flow'}
+            </DialogTitle>
             <DialogDescription>
-              Build a step-by-step guide for customer onboarding
+              {isAIEnabled 
+                ? 'Describe your goal and let AI build the entire flow for you'
+                : 'Build a step-by-step guide for customer onboarding'
+              }
             </DialogDescription>
           </DialogHeader>
+
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="company">Company *</Label>
@@ -262,31 +269,71 @@ export function FlowsPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="flowName">Flow Name *</Label>
-              <Input
-                id="flowName"
-                placeholder="New Customer Setup"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                placeholder="Describe this onboarding flow..."
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                rows={3}
-              />
-            </div>
+
+            {isAIEnabled ? (
+              <div className="space-y-2">
+                <Label htmlFor="aiPrompt">What is the goal of this onboarding flow?</Label>
+                <Textarea
+                  id="aiPrompt"
+                  placeholder="e.g. Create an onboarding for a project management tool where users need to create a workspace, invite 3 members, and set up their first board."
+                  value={aiPrompt}
+                  onChange={(e) => setAiPrompt(e.target.value)}
+                  rows={4}
+                />
+                <p className="text-xs text-muted-foreground">
+                  AI will generate the name, description, and all necessary steps.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="flowName">Flow Name *</Label>
+                  <Input
+                    id="flowName"
+                    placeholder="New Customer Setup"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    placeholder="Describe this onboarding flow..."
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    rows={3}
+                  />
+                </div>
+              </>
+            )}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleCreate}>Create Flow</Button>
+
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <div className="flex-1">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setIsAIEnabled(!isAIEnabled)}
+                className="gap-2 text-primary"
+              >
+                <Sparkles className="h-4 w-4" />
+                {isAIEnabled ? 'Switch to Manual' : 'Use AI Architect'}
+              </Button>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isGenerating}>
+                Cancel
+              </Button>
+              {isAIEnabled ? (
+                <Button onClick={handleAIGenerate} disabled={isGenerating} className="gap-2">
+                  {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                  Generate Flow
+                </Button>
+              ) : (
+                <Button onClick={handleCreate}>Create Flow</Button>
+              )}
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

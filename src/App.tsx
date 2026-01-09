@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { blink } from '@/lib/blink'
 import { Toaster } from '@/components/ui/sonner'
 import { Workflow, CheckCircle2, Users, BarChart3 } from 'lucide-react'
+import { BlinkProvider, BlinkAuthProvider } from '@blinkdotnew/react'
 
 function LandingPage() {
   return (
@@ -120,10 +121,17 @@ function AppContent() {
 
 function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-      <Toaster />
-    </AuthProvider>
+    <BlinkProvider 
+      projectId={import.meta.env.VITE_BLINK_PROJECT_ID}
+      publishableKey={import.meta.env.VITE_BLINK_PUBLISHABLE_KEY}
+    >
+      <BlinkAuthProvider>
+        <AuthProvider>
+          <AppContent />
+          <Toaster />
+        </AuthProvider>
+      </BlinkAuthProvider>
+    </BlinkProvider>
   )
 }
 

@@ -281,7 +281,36 @@ export function FlowStepsPage({ flowId, onBack }: FlowStepsPageProps) {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="stepContent">Detailed Instructions / Content</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="stepContent">Detailed Instructions / Content</Label>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8 gap-2 text-primary"
+                      disabled={isRefining || !formData.content.trim()}
+                    >
+                      {isRefining ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                      Refine with AI
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => handleRefineContent('professional')}>
+                      <Wand2 className="h-4 w-4 mr-2" />
+                      Professional
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleRefineContent('friendly')}>
+                      <Wand2 className="h-4 w-4 mr-2" />
+                      Friendly
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleRefineContent('concise')}>
+                      <Wand2 className="h-4 w-4 mr-2" />
+                      Concise
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
               <Textarea
                 id="stepContent"
                 placeholder="Markdown or HTML supported..."
